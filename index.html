@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fearless胆大心细 - 最终优化版</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            /* 修改：背景改为深青色，区别于绿色卡牌 */
+            background-color: #006064; 
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            user-select: none;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 启动界面 */
+        #setup-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: white;
+        }
+
+        #setup-screen button {
+            font-size: 20px;
+            padding: 15px 30px;
+            margin: 10px;
+            cursor: pointer;
+            background: #ff9800;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            width: 200px;
+        }
+        #setup-screen button:hover { background: #f57c00; }
+
+        /* 游戏区域 */
+        #game-area {
+            flex: 1;
+            position: relative;
+            display: none;
+        }
+
+        /* 玩家/电脑位置容器 */
+        .player-seat {
+            position: absolute;
+            width: 100px;
+            text-align: center;
+            color: white;
+            transition: all 0.5s;
+            z-index: 20;
+            font-size: 12px;
+        }
+
+        .player-name { font-weight: bold; font-size: 14px; margin-bottom: 2px; white-space: nowrap;}
+        /* 活跃玩家名字高亮 */
+        .active-turn .player-name { color: #ffeb3b; text-shadow: 0 0 8px #ff5722; font-size: 16px; }
+
+        .stats-box {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #aaa;
+            padding: 2px;
+            margin: 1px auto;
+            border-radius: 4px;
+            font-size: 12px;
+            width: 90px;
+        }
+        
+        /* 打牌总和气泡 */
+        .current-sum-bubble {
+            background: #fff;
+            color: #000;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            line-height: 70px;
+            text-align: center;
+            position: absolute;
+            font-weight: bold;
+            font-size: 28px;
+            display: none; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+            z-index: 100;
+            border: 3px solid #333;
+        }
+
+        /* --- 卡牌样式 --- */
+        .card {
+            width: 60px;
+            height: 90px;
+            border-radius: 6px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 26px;
+            font-weight: bold;
+            position: relative;
+            border: 2px solid rgba(255,255,255,0.3);
+            vertical-align: bottom;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.4);
+            cursor: default;
+            background-color: white;
+            transition: transform 0.2s, filter 0.3s; /* 增加灰度过渡 */
+        }
+
+        /* 
+           修改：所有卡牌文字改为白色 
+           加深背景色以保证对比度
+        */
+        .card.red { background: #b71c1c; color: white; border-color: #e57373; }     
+        .card.blue { background: #0d47a1; color: white; border-color: #64b5f6; }     
+        /* 黄色改为深琥珀色，配合白字 */
+        .card.yellow { background: #ff6f00; color: white; border-color: #ffd54f; }   
+        .card.green { background: #1b5e20; color: white; border-color: #81c784; }    
+
+        /* 百搭牌保持条纹，文字加描边 */
+        .card.wild {
+            background: repeating-linear-gradient(
+                45deg,
+                #ef5350,
+                #ef5350 10px,
+                #42a5f5 10px,
+                #42a5f5 20px,
+                #fbc02d 20px,
+                #fbc02d 30px,
+                #66bb6a 30px,
+                #66bb6a 40px
+            );
+            color: white;
+            border: 2px solid #fff;
+            text-shadow: 0 0 3px #000; /* 黑色描边确保白字在条纹上可见 */
+        }
+
+        .card-corner-num {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 14px;
+            font-weight: normal;
+            opacity: 0.9;
+        }
+
+        /* 玩家手牌区域 */
+        #hand-container {
+            position: absolute;
+            bottom: 120px; 
+            left: 0;
+            width: 100%;
+            height: 110px;
+            display: flex;
+            justify-content: center; 
+            align-items: flex-end;
+            z-index: 50;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+
+        #hand-container .card {
+            margin-left: -35px;
+            position: relative;
+        }
+        #hand-container .card:first-child { margin-left: 0; }
+
+        /* --- 核心修改：不可打出卡牌变灰逻辑 --- */
+        
+        /* 当处于"玩家回合"模式(my-turn)时，默认将所有卡牌变灰 */
+        #hand-container.my-turn .card {
+            filter: grayscale(100%) brightness(60%); /* 变灰并变暗 */
+            cursor: not-allowed;
+            transform: translateY(0);
+        }
+
+        /* 当处于"玩家回合"模式时，只有带有playable类的卡牌恢复彩色 */
+        #hand-container.my-turn .card.playable {
+            filter: grayscale(0%) brightness(100%); /* 恢复 */
+            cursor: pointer;
+            border-color: #ffeb3b;
+            box-shadow: 0 0 10px #ffeb3b;
+            z-index: 60;
+        }
+
+        /* 选中/悬停效果 */
+        #hand-container.my-turn .card.playable:active,
+        #hand-container.my-turn .card.playable:hover { 
+            transform: translateY(-25px) scale(1.1);
+            z-index: 100 !important;
+            margin-right: 15px; 
+            margin-left: -20px;
+        }
+
+        /* 出牌区 */
+        #table-area {
+            position: absolute;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%; height: 200px;
+            pointer-events: none; 
+        }
+        
+        .played-card {
+            position: absolute;
+            transition: all 0.5s ease-out;
+            z-index: 10;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5) !important;
+            margin-left: 0 !important;
+            filter: none !important; /* 确保打出的牌不灰 */
+        }
+
+        /* 消息提示 */
+        #message-box {
+            position: absolute;
+            top: 12%; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 200;
+            width: 80%;
+            text-align: center;
+        }
+
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            color: white;
+            z-index: 300;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #results-list { text-align: left; margin: 20px; font-size: 18px; line-height: 1.8;}
+
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <h1>Fearless</h1>
+        <h1>胆大心细</h1>
+        <p>选择玩家人数</p>
+        <button onclick="initGame(3)">3 人游戏</button>
+        <button onclick="initGame(4)">4 人游戏</button>
+        <button onclick="initGame(5)">5 人游戏</button>
+    </div>
+
+    <div id="game-area">
+        <div id="message-box">游戏开始</div>
+        <div id="table-area"></div>
+        
+        <!-- 玩家手牌 -->
+        <div id="hand-container"></div>
+
+        <!-- 玩家座位将由JS动态生成 -->
+    </div>
+
+    <div id="game-over-screen">
+        <h1>游戏结束</h1>
+        <div id="results-list"></div>
+        <button style="padding:10px 30px; font-size:18px; background:#e65100; color:white; border:none; border-radius:5px;" onclick="location.reload()">重新开始</button>
+    </div>
+
+<script>
+    const COLORS = ['red', 'blue', 'yellow', 'green'];
+    const BASE_VALUES = [-6, -5, -4, -3, -2, -1, -1, 1, 1, 2, 3, 4, 5, 6];
+    
+    let playerCount = 0;
+    let players = []; 
+    let deck = [];
+    let currentRound = 1;
+    let totalRounds = 0;
+    let startPlayerIndex = 0; 
+    let currentPlayerIndex = 0;
+    let trickCards = []; 
+    let currentTrickSum = 0;
+    let leadColor = null; 
+
+    function initGame(n) {
+        playerCount = n;
+        totalRounds = n;
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('game-area').style.display = 'block';
+        
+        createPlayers();
+        setupLayout();
+        startRound();
+    }
+
+    function createPlayers() {
+        players = [];
+        players.push({ id: 0, name: "玩家(你)", hand: [], shock: 0, fear: 0, isAI: false });
+        for (let i = 1; i < playerCount; i++) {
+            players.push({ id: i, name: `电脑 ${i}`, hand: [], shock: 0, fear: 0, isAI: true });
+        }
+    }
+
+    function setupLayout() {
+        const gameArea = document.getElementById('game-area');
+        document.querySelectorAll('.player-seat').forEach(el => el.remove());
+
+        const positions = {
+            3: [
+                { top: '', left: '', bottom: '10px', cssLeft: '50%', transform: 'translateX(-50%)' }, 
+                { top: '15%', left: '2%' }, 
+                { top: '15%', left: 'auto', right: '2%' }  
+            ],
+            4: [
+                { top: '', left: '', bottom: '10px', cssLeft: '50%', transform: 'translateX(-50%)' }, 
+                { top: '30%', left: '2%' }, 
+                { top: '2%', left: '50%', transform: 'translateX(-50%)' }, 
+                { top: '30%', left: 'auto', right: '2%' } 
+            ],
+            5: [
+                { top: '', left: '', bottom: '10px', cssLeft: '50%', transform: 'translateX(-50%)' }, 
+                { top: '35%', left: '2%' }, 
+                { top: '8%', left: '15%' }, 
+                { top: '8%', left: 'auto', right: '15%' },
+                { top: '35%', left: 'auto', right: '2%' }  
+            ]
+        };
+
+        const layout = positions[playerCount];
+
+        players.forEach((p, idx) => {
+            const div = document.createElement('div');
+            div.className = 'player-seat';
+            div.id = `seat-${idx}`;
+            
+            const style = layout[idx];
+            if(style.top) div.style.top = style.top;
+            if(style.left) div.style.left = style.left;
+            if(style.right) div.style.right = style.right;
+            if(style.bottom) div.style.bottom = style.bottom;
+            if(style.cssLeft) div.style.left = style.cssLeft;
+            if(style.transform) div.style.transform = style.transform;
+
+            let bubbleStyle = "";
+            if (idx === 0) {
+                bubbleStyle = "top: -240px; left: 50%; transform: translateX(-50%);";
+            } else {
+                if (style.left === '50%') { 
+                    bubbleStyle = "top: 110%; left: 50%; transform: translateX(-50%);";
+                } else if (style.right) { 
+                    bubbleStyle = "top: 0; right: 110%; left: auto; transform: none;";
+                } else { 
+                    bubbleStyle = "top: 0; left: 110%; transform: none;";
+                }
+            }
+
+            div.innerHTML = `
+                <div class="current-sum-bubble" id="bubble-${idx}" style="${bubbleStyle}"></div>
+                <div class="player-name">${p.name}</div>
+                <div class="stats-box shock-val">惊吓: <span id="shock-${idx}">0</span></div>
+                <div class="stats-box fear-pts">恐惧: <span id="fear-${idx}">0</span></div>
+            `;
+            gameArea.appendChild(div);
+        });
+    }
+
+    function createDeck() {
+        let deckList = [];
+        let activeColors = [...COLORS];
+        if (playerCount === 3) {
+            activeColors = ['red', 'blue', 'yellow'];
+        }
+
+        activeColors.forEach(color => {
+            let values = [...BASE_VALUES]; 
+            if (playerCount === 3 || playerCount === 4) {
+                let idxNeg = values.indexOf(-1);
+                if (idxNeg > -1) values.splice(idxNeg, 1);
+                let idxPos = values.indexOf(1);
+                if (idxPos > -1) values.splice(idxPos, 1);
+            }
+            values.forEach(val => {
+                deckList.push({ color: color, value: val, type: 'normal', id: Math.random() });
+            });
+        });
+
+        for(let i=0; i<4; i++) {
+            deckList.push({ color: 'wild', value: 0, type: 'wild', id: Math.random() });
+        }
+
+        return shuffle(deckList);
+    }
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function startRound() {
+        if (currentRound > totalRounds) {
+            gameOver();
+            return;
+        }
+
+        showMessage(`第 ${currentRound} 轮开始`);
+        deck = createDeck();
+        
+        const cardsPerPlayer = playerCount === 5 ? 12 : 13;
+        
+        players.forEach(p => {
+            p.hand = deck.splice(0, cardsPerPlayer);
+            p.hand.sort((a, b) => {
+                if (a.color === b.color) return a.value - b.value;
+                return a.color.localeCompare(b.color);
+            });
+            p.shock = 0;
+            updateStatsUI(p.id);
+        });
+
+        if (currentRound === 1) {
+            startPlayerIndex = Math.floor(Math.random() * playerCount);
+        } else {
+            startPlayerIndex = (startPlayerIndex + 1) % playerCount;
+        }
+        
+        currentPlayerIndex = startPlayerIndex;
+        
+        renderHand();
+        startTurn();
+    }
+
+    function startTurn() {
+        document.querySelectorAll('.player-seat').forEach(el => el.classList.remove('active-turn'));
+        document.getElementById(`seat-${currentPlayerIndex}`).classList.add('active-turn');
+
+        // 移除玩家回合标识，防止误触灰度
+        document.getElementById('hand-container').classList.remove('my-turn');
+
+        if (trickCards.length === playerCount) {
+            setTimeout(resolveTrick, 1000);
+            return;
+        }
+
+        if (trickCards.length === 0) {
+            leadColor = null;
+            currentTrickSum = 0;
+            document.getElementById('table-area').innerHTML = '';
+            document.querySelectorAll('.current-sum-bubble').forEach(el => {
+                el.style.display = 'none';
+                el.innerText = '';
+            });
+        }
+
+        const player = players[currentPlayerIndex];
+        
+        if (player.isAI) {
+            setTimeout(aiPlay, 1000); 
+        } else {
+            highlightPlayableCards();
+            // 添加玩家回合标识，触发CSS灰度逻辑
+            document.getElementById('hand-container').classList.add('my-turn');
+            showMessage("轮到你");
+        }
+    }
+
+    function highlightPlayableCards() {
+        const handContainer = document.getElementById('hand-container');
+        const cards = handContainer.children;
+        const player = players[0];
+
+        for (let i = 0; i < cards.length; i++) {
+            const cardIdx = parseInt(cards[i].dataset.index);
+            const cardObj = player.hand[cardIdx];
+            
+            if (canPlay(cardObj, player.hand)) {
+                cards[i].classList.add('playable');
+                cards[i].onclick = () => playerPlayCard(cardIdx);
+            } else {
+                cards[i].classList.remove('playable');
+                cards[i].onclick = null;
+            }
+        }
+    }
+
+    function canPlay(card, hand) {
+        if (trickCards.length === 0) return true; 
+        if (!leadColor) return true; 
+
+        const hasColor = hand.some(c => c.color === leadColor);
+        
+        if (hasColor) {
+            if (card.color === leadColor || card.color === 'wild') return true;
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    function playerPlayCard(index) {
+        // 立即移除可点击状态
+        document.getElementById('hand-container').classList.remove('my-turn');
+        const handContainer = document.getElementById('hand-container');
+        for (let i = 0; i < handContainer.children.length; i++) {
+             handContainer.children[i].onclick = null;
+             handContainer.children[i].classList.remove('playable');
+        }
+
+        const player = players[0];
+        const card = player.hand[index];
+        player.hand.splice(index, 1);
+        renderHand(); 
+        executePlay(0, card);
+    }
+
+    function aiPlay() {
+        const player = players[currentPlayerIndex];
+        let validCards = player.hand.filter(c => canPlay(c, player.hand));
+        let index = Math.floor(Math.random() * validCards.length);
+        let cardToPlay = validCards[index];
+        
+        let originalIndex = player.hand.indexOf(cardToPlay);
+        player.hand.splice(originalIndex, 1);
+        
+        executePlay(currentPlayerIndex, cardToPlay);
+    }
+
+    function executePlay(pIndex, card) {
+        if (trickCards.length === 0) {
+            if (card.color !== 'wild') {
+                leadColor = card.color;
+            }
+        } else if (leadColor === null && card.color !== 'wild') {
+            leadColor = card.color;
+        }
+
+        currentTrickSum += card.value;
+        trickCards.push({
+            playerId: pIndex,
+            card: card,
+            sumSnapshot: currentTrickSum
+        });
+
+        renderPlayedCard(pIndex, card);
+        updateSumBubble(pIndex, currentTrickSum);
+
+        currentPlayerIndex = (currentPlayerIndex + 1) % playerCount;
+        startTurn();
+    }
+
+    function renderPlayedCard(pIndex, card) {
+        const table = document.getElementById('table-area');
+        const cardDiv = createCardElement(card);
+        cardDiv.classList.add('played-card');
+        
+        let offsetX = 0; 
+        let offsetY = 0;
+        
+        const deg = (pIndex * (360/playerCount) + 90) % 360;
+        const rad = deg * Math.PI / 180;
+        offsetX = Math.cos(rad) * 60;
+        offsetY = Math.sin(rad) * 60;
+
+        cardDiv.style.left = `calc(50% + ${offsetX}px - 30px)`;
+        cardDiv.style.top = `calc(50% + ${offsetY}px - 45px)`;
+        
+        table.appendChild(cardDiv);
+    }
+
+    function updateSumBubble(pIndex, sum) {
+        const bubble = document.getElementById(`bubble-${pIndex}`);
+        bubble.innerText = (sum > 0 ? '+' : '') + sum;
+        bubble.style.display = 'block';
+        if (sum > 0) bubble.style.color = '#d32f2f';
+        else if (sum < 0) bubble.style.color = '#1976d2';
+        else bubble.style.color = 'black';
+    }
+
+    function resolveTrick() {
+        const effectiveLeadColor = leadColor; 
+        let validPlays = trickCards.filter(play => {
+            if (!effectiveLeadColor) return true; 
+            return play.card.color === effectiveLeadColor || play.card.color === 'wild';
+        });
+
+        let maxValue = -999;
+        validPlays.forEach(p => {
+            if (p.card.value > maxValue) maxValue = p.card.value;
+        });
+
+        let potentialWinners = validPlays.filter(p => p.card.value === maxValue);
+        let winnerPlay = potentialWinners[0]; 
+
+        const winnerId = winnerPlay.playerId;
+        const score = winnerPlay.sumSnapshot; 
+
+        showMessage(`${players[winnerId].name} 赢 ${score} 惊吓`);
+
+        const playedCards = document.querySelectorAll('.played-card');
+        playedCards.forEach(el => el.style.opacity = 0);
+
+        players[winnerId].shock += score;
+        updateStatsUI(winnerId);
+
+        currentPlayerIndex = winnerId;
+        trickCards = [];
+        setTimeout(() => {
+            if (players[0].hand.length === 0) {
+                endRound();
+            } else {
+                startTurn();
+            }
+        }, 1200);
+    }
+
+    function endRound() {
+        players.forEach(p => {
+            let points = 0;
+            if (p.shock === 0) {
+                points = 15;
+            } else {
+                points = Math.abs(p.shock);
+            }
+            p.fear += points;
+            p.shock = 0; 
+            updateStatsUI(p.id);
+        });
+
+        showMessage("本轮结束，结算恐惧");
+        currentRound++;
+        setTimeout(startRound, 2000);
+    }
+
+    function gameOver() {
+        document.getElementById('game-over-screen').style.display = 'flex';
+        let sortedPlayers = [...players].sort((a, b) => a.fear - b.fear);
+        let minFear = sortedPlayers[0].fear;
+        
+        let html = '<h2>最终结果</h2>';
+        sortedPlayers.forEach(p => {
+            let isWin = p.fear === minFear;
+            html += `<p style="${isWin ? 'color:gold;font-weight:bold;' : ''}">
+                ${p.name}: ${p.fear} ${isWin ? '🏆' : ''}
+            </p>`;
+        });
+        document.getElementById('results-list').innerHTML = html;
+    }
+
+    function createCardElement(cardData) {
+        const div = document.createElement('div');
+        div.className = `card ${cardData.color}`;
+        div.dataset.index = -1; 
+        
+        let mainText = '';
+        if (cardData.color === 'wild') {
+            mainText = '0';
+        } else {
+            mainText = cardData.value > 0 ? '+' + cardData.value : cardData.value;
+        }
+        
+        div.innerText = mainText;
+        
+        const cornerSpan = document.createElement('div');
+        cornerSpan.className = 'card-corner-num';
+        cornerSpan.innerText = mainText;
+        div.appendChild(cornerSpan);
+
+        return div;
+    }
+
+    function renderHand() {
+        const container = document.getElementById('hand-container');
+        container.innerHTML = '';
+        players[0].hand.forEach((card, index) => {
+            const el = createCardElement(card);
+            el.dataset.index = index;
+            container.appendChild(el);
+        });
+    }
+
+    function updateStatsUI(pid) {
+        document.getElementById(`shock-${pid}`).innerText = players[pid].shock;
+        document.getElementById(`fear-${pid}`).innerText = players[pid].fear;
+    }
+
+    function showMessage(msg) {
+        const box = document.getElementById('message-box');
+        box.innerText = msg;
+        box.style.opacity = 1;
+        setTimeout(() => {
+            box.style.opacity = 0;
+        }, 2000);
+    }
+
+</script>
+</body>
+</html>
