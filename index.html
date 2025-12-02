@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>胆大心细 - 完整版</title>
+    <title>胆大心细 - 最终版</title>
     <style>
         body {
             font-family: 'Microsoft YaHei', sans-serif;
@@ -17,11 +17,11 @@
             flex-direction: column;
         }
 
-        /* 启动界面 & 规则介绍 */
+        /* 启动界面 */
         #setup-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95); /* 背景稍微加深 */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -30,25 +30,17 @@
             color: white;
             padding: 20px;
             box-sizing: border-box;
+            overflow-y: auto; /* 防止小屏幕内容溢出 */
         }
 
-        #rules-box {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            max-width: 600px;
-            width: 90%;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255,255,255,0.3);
-            font-size: 15px;
-            line-height: 1.6;
+        h1 { margin-bottom: 10px; margin-top: 0; font-size: 36px; text-shadow: 0 0 10px #ff9800; }
+
+        /* 按钮样式 */
+        .btn-group {
+            margin-bottom: 20px;
+            text-align: center;
         }
-
-        #rules-box h2 { margin-top: 0; color: #ffca28; text-align: center; }
-        #rules-box ul { padding-left: 20px; }
-        #rules-box li { margin-bottom: 8px; }
-        .highlight-rule { color: #ff5252; font-weight: bold; }
-
+        
         #setup-screen button {
             font-size: 20px;
             padding: 12px 30px;
@@ -59,10 +51,30 @@
             border-radius: 8px;
             color: white;
             font-weight: bold;
-            width: 200px;
-            transition: background 0.2s;
+            width: 200px; /* 统一宽度 */
+            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        #setup-screen button:hover { background: #f57c00; }
+        #setup-screen button:hover { background: #f57c00; transform: scale(1.05); }
+        #setup-screen button:active { transform: scale(0.95); }
+
+        /* 规则框样式 */
+        #rules-box {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 95%;
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 15px;
+            line-height: 1.6;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #rules-box h2 { margin-top: 0; color: #ffca28; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;}
+        #rules-box ul { padding-left: 20px; margin-bottom: 10px; }
+        #rules-box li { margin-bottom: 8px; }
+        .highlight-rule { color: #ff5252; font-weight: bold; }
 
         /* 游戏区域 */
         #game-area {
@@ -100,7 +112,7 @@
             background: #fff;
             color: #000;
             border-radius: 50%;
-            width: 60px; /* 稍微调小一点点以适应布局 */
+            width: 60px;
             height: 60px;
             line-height: 60px;
             text-align: center;
@@ -132,7 +144,6 @@
             transition: transform 0.2s, filter 0.3s;
         }
 
-        /* 配色：全白字，深背景 */
         .card.red { background: #b71c1c; color: white; border-color: #e57373; }     
         .card.blue { background: #0d47a1; color: white; border-color: #64b5f6; }     
         .card.yellow { background: #ff6f00; color: white; border-color: #ffd54f; }   
@@ -262,20 +273,25 @@
 <body>
 
     <div id="setup-screen">
-        <h1>Fearless</h1>
-        <h1>胆大心细</h1>
-        <div>
-            <button onclick="initGame(3)">3 人游戏</button>
-            <button onclick="initGame(4)">4 人游戏</button>
-            <button onclick="initGame(5)">5 人游戏</button>
+        <h1>Fearless胆大心细</h1>
+        
+        <!-- 按钮区域 (移到上方) -->
+        <div class="btn-group">
+            <p style="margin-bottom: 15px; font-size: 18px;">请选择玩家人数开始游戏</p>
+            <div>
+                <button onclick="initGame(3)">3 人游戏</button><br>
+                <button onclick="initGame(4)">4 人游戏</button><br>
+                <button onclick="initGame(5)">5 人游戏</button>
+            </div>
         </div>
-        <!-- 游戏玩法介绍 -->
+
+        <!-- 游戏玩法介绍 (移到下方) -->
         <div id="rules-box">
             <h2>游戏规则</h2>
             <ul>
                 <li><b>目标：</b>多轮游戏结束后，<b>恐惧点数</b>最低者获胜。</li>
-                <li><b>出牌：</b>必须跟打领头花色（无牌可垫牌，0为百搭等同于领头花色）。</li>
-                <li><b>赢墩：</b>领头花色数字最大者赢下该墩，获得该墩所有数字之和的“惊吓值”。</li>
+                <li><b>出牌：</b>必须跟打领头花色（无牌可垫牌，0为百搭）。</li>
+                <li><b>赢墩：</b>同花色数字最大者赢下该墩，获得该墩所有数字之和的“惊吓值”。</li>
                 <li><b>结算：</b>一轮结束时，惊吓值转化为恐惧点数（取绝对值）。</li>
                 <li class="highlight-rule">★ 关键：如果你的惊吓值正好为 0，则受到 15 点恐惧惩罚！</li>
             </ul>
@@ -283,9 +299,6 @@
                 (胆大：拿高分牌消除负分 | 心细：精准控分避免中招)
             </div>
         </div>
-
-        <p>选择玩家人数开始游戏</p>
-
     </div>
 
     <div id="game-area">
@@ -378,14 +391,13 @@
             if(style.cssLeft) div.style.left = style.cssLeft;
             if(style.transform) div.style.transform = style.transform;
 
-            // --- 气泡定位逻辑调整 ---
+            // --- 气泡定位逻辑 (保持上一版优化) ---
             let bubbleStyle = "";
             if (idx === 0) {
                 // 玩家：手牌上方
                 bubbleStyle = "top: -250px; left: 50%; transform: translateX(-50%);";
             } else {
-                // 电脑：统一移动到恐惧点数下方 (bottom center)
-                // top: 100% 代表在容器底部边缘，margin-top 给一点间距
+                // 电脑：统一移动到恐惧点数下方
                 bubbleStyle = "top: 105%; left: 50%; transform: translateX(-50%);";
             }
 
