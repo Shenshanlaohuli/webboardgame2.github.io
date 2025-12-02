@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fearless胆大心细 - 最终优化版</title>
+    <title>胆大心细 - 完整版</title>
     <style>
         body {
             font-family: 'Microsoft YaHei', sans-serif;
-            /* 修改：背景改为深青色，区别于绿色卡牌 */
-            background-color: #006064; 
+            background-color: #006064; /* 深青色背景 */
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -18,23 +17,42 @@
             flex-direction: column;
         }
 
-        /* 启动界面 */
+        /* 启动界面 & 规则介绍 */
         #setup-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 200;
             color: white;
+            padding: 20px;
+            box-sizing: border-box;
         }
+
+        #rules-box {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 90%;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.3);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        #rules-box h2 { margin-top: 0; color: #ffca28; text-align: center; }
+        #rules-box ul { padding-left: 20px; }
+        #rules-box li { margin-bottom: 8px; }
+        .highlight-rule { color: #ff5252; font-weight: bold; }
 
         #setup-screen button {
             font-size: 20px;
-            padding: 15px 30px;
-            margin: 10px;
+            padding: 12px 30px;
+            margin: 8px;
             cursor: pointer;
             background: #ff9800;
             border: none;
@@ -42,6 +60,7 @@
             color: white;
             font-weight: bold;
             width: 200px;
+            transition: background 0.2s;
         }
         #setup-screen button:hover { background: #f57c00; }
 
@@ -64,7 +83,6 @@
         }
 
         .player-name { font-weight: bold; font-size: 14px; margin-bottom: 2px; white-space: nowrap;}
-        /* 活跃玩家名字高亮 */
         .active-turn .player-name { color: #ffeb3b; text-shadow: 0 0 8px #ff5722; font-size: 16px; }
 
         .stats-box {
@@ -82,13 +100,13 @@
             background: #fff;
             color: #000;
             border-radius: 50%;
-            width: 70px;
-            height: 70px;
-            line-height: 70px;
+            width: 60px; /* 稍微调小一点点以适应布局 */
+            height: 60px;
+            line-height: 60px;
             text-align: center;
             position: absolute;
             font-weight: bold;
-            font-size: 28px;
+            font-size: 24px;
             display: none; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.7);
             z-index: 100;
@@ -111,20 +129,15 @@
             box-shadow: -2px 0 5px rgba(0,0,0,0.4);
             cursor: default;
             background-color: white;
-            transition: transform 0.2s, filter 0.3s; /* 增加灰度过渡 */
+            transition: transform 0.2s, filter 0.3s;
         }
 
-        /* 
-           修改：所有卡牌文字改为白色 
-           加深背景色以保证对比度
-        */
+        /* 配色：全白字，深背景 */
         .card.red { background: #b71c1c; color: white; border-color: #e57373; }     
         .card.blue { background: #0d47a1; color: white; border-color: #64b5f6; }     
-        /* 黄色改为深琥珀色，配合白字 */
         .card.yellow { background: #ff6f00; color: white; border-color: #ffd54f; }   
         .card.green { background: #1b5e20; color: white; border-color: #81c784; }    
 
-        /* 百搭牌保持条纹，文字加描边 */
         .card.wild {
             background: repeating-linear-gradient(
                 45deg,
@@ -139,7 +152,7 @@
             );
             color: white;
             border: 2px solid #fff;
-            text-shadow: 0 0 3px #000; /* 黑色描边确保白字在条纹上可见 */
+            text-shadow: 0 0 3px #000;
         }
 
         .card-corner-num {
@@ -172,25 +185,21 @@
         }
         #hand-container .card:first-child { margin-left: 0; }
 
-        /* --- 核心修改：不可打出卡牌变灰逻辑 --- */
-        
-        /* 当处于"玩家回合"模式(my-turn)时，默认将所有卡牌变灰 */
+        /* 灰度遮罩逻辑 */
         #hand-container.my-turn .card {
-            filter: grayscale(100%) brightness(60%); /* 变灰并变暗 */
+            filter: grayscale(100%) brightness(60%);
             cursor: not-allowed;
             transform: translateY(0);
         }
 
-        /* 当处于"玩家回合"模式时，只有带有playable类的卡牌恢复彩色 */
         #hand-container.my-turn .card.playable {
-            filter: grayscale(0%) brightness(100%); /* 恢复 */
+            filter: grayscale(0%) brightness(100%);
             cursor: pointer;
             border-color: #ffeb3b;
             box-shadow: 0 0 10px #ffeb3b;
             z-index: 60;
         }
 
-        /* 选中/悬停效果 */
         #hand-container.my-turn .card.playable:active,
         #hand-container.my-turn .card.playable:hover { 
             transform: translateY(-25px) scale(1.1);
@@ -214,7 +223,7 @@
             z-index: 10;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.5) !important;
             margin-left: 0 !important;
-            filter: none !important; /* 确保打出的牌不灰 */
+            filter: none !important;
         }
 
         /* 消息提示 */
@@ -255,10 +264,28 @@
     <div id="setup-screen">
         <h1>Fearless</h1>
         <h1>胆大心细</h1>
-        <p>选择玩家人数</p>
-        <button onclick="initGame(3)">3 人游戏</button>
-        <button onclick="initGame(4)">4 人游戏</button>
-        <button onclick="initGame(5)">5 人游戏</button>
+        <div>
+            <button onclick="initGame(3)">3 人游戏</button>
+            <button onclick="initGame(4)">4 人游戏</button>
+            <button onclick="initGame(5)">5 人游戏</button>
+        </div>
+        <!-- 游戏玩法介绍 -->
+        <div id="rules-box">
+            <h2>游戏规则</h2>
+            <ul>
+                <li><b>目标：</b>多轮游戏结束后，<b>恐惧点数</b>最低者获胜。</li>
+                <li><b>出牌：</b>必须跟打领头花色（无牌可垫牌，0为百搭等同于领头花色）。</li>
+                <li><b>赢墩：</b>领头花色数字最大者赢下该墩，获得该墩所有数字之和的“惊吓值”。</li>
+                <li><b>结算：</b>一轮结束时，惊吓值转化为恐惧点数（取绝对值）。</li>
+                <li class="highlight-rule">★ 关键：如果你的惊吓值正好为 0，则受到 15 点恐惧惩罚！</li>
+            </ul>
+            <div style="text-align:center; font-style:italic; font-size:13px; color:#ccc;">
+                (胆大：拿高分牌消除负分 | 心细：精准控分避免中招)
+            </div>
+        </div>
+
+        <p>选择玩家人数开始游戏</p>
+
     </div>
 
     <div id="game-area">
@@ -351,17 +378,15 @@
             if(style.cssLeft) div.style.left = style.cssLeft;
             if(style.transform) div.style.transform = style.transform;
 
+            // --- 气泡定位逻辑调整 ---
             let bubbleStyle = "";
             if (idx === 0) {
-                bubbleStyle = "top: -240px; left: 50%; transform: translateX(-50%);";
+                // 玩家：手牌上方
+                bubbleStyle = "top: -250px; left: 50%; transform: translateX(-50%);";
             } else {
-                if (style.left === '50%') { 
-                    bubbleStyle = "top: 110%; left: 50%; transform: translateX(-50%);";
-                } else if (style.right) { 
-                    bubbleStyle = "top: 0; right: 110%; left: auto; transform: none;";
-                } else { 
-                    bubbleStyle = "top: 0; left: 110%; transform: none;";
-                }
+                // 电脑：统一移动到恐惧点数下方 (bottom center)
+                // top: 100% 代表在容器底部边缘，margin-top 给一点间距
+                bubbleStyle = "top: 105%; left: 50%; transform: translateX(-50%);";
             }
 
             div.innerHTML = `
@@ -446,7 +471,6 @@
         document.querySelectorAll('.player-seat').forEach(el => el.classList.remove('active-turn'));
         document.getElementById(`seat-${currentPlayerIndex}`).classList.add('active-turn');
 
-        // 移除玩家回合标识，防止误触灰度
         document.getElementById('hand-container').classList.remove('my-turn');
 
         if (trickCards.length === playerCount) {
@@ -470,7 +494,6 @@
             setTimeout(aiPlay, 1000); 
         } else {
             highlightPlayableCards();
-            // 添加玩家回合标识，触发CSS灰度逻辑
             document.getElementById('hand-container').classList.add('my-turn');
             showMessage("轮到你");
         }
@@ -510,7 +533,6 @@
     }
 
     function playerPlayCard(index) {
-        // 立即移除可点击状态
         document.getElementById('hand-container').classList.remove('my-turn');
         const handContainer = document.getElementById('hand-container');
         for (let i = 0; i < handContainer.children.length; i++) {
